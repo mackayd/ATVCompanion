@@ -1,0 +1,7 @@
+installer/Product.wxs
+create-sln.ps1
+bin/
+obj/
+.vs/
+*.user
+*.suo
