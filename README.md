@@ -1,3 +1,7 @@
+![Alt text for accessibility](assets/Compandroid.png)
+
+
+
 # ATVCompanion
 
 A small Windows app + CLI that lets you **wake**, **pair**, and **put in standby** Philips Android TVs that expose the **JointSPACE v6** API. It’s built for everyday use (a simple window with three buttons) and structured for easy extension (plugins, CLI, service).
