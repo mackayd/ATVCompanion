@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Core</name>
+    </assembly>
+    <members>
+        <member name="T:Core.Config.AppConfig">
+            <summary>
+            Persisted configuration for ATVCompanion.
+            </summary>
+        </member>
+        <member name="T:Core.Config.ConfigStore">
+            <summary>
+            Static storage helper for reading/writing AppConfig to %ProgramData%\ATVCompanion\config.json
+            </summary>
+        </member>
+    </members>
+</doc>

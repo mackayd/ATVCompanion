@@ -1,0 +1,27 @@
+name: Release portable bundles
+
+on:
+  push:
+    tags:
+      - "v*"          # e.g. v1.0.0
+  workflow_dispatch:   # allow manual runs
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # Portable (framework-dependent) builds
+      - name: Publish UI (portable)
+        run: dotnet publish .\src\UI\UI.csproj -c Release
