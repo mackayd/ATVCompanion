@@ -1,0 +1,6 @@
+<!-- NOTE: Ensure your Create Tasks button looks like this inside MainWindow.xaml:
+<Button x:Name="CreateTasksButton"
+        Content="Create Tasks"
+        Click="CreateTasksButton_Click"
+        Margin="6" />
+-->

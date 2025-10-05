@@ -1,0 +1,48 @@
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Where WiX v3 MSBuild targets live -->
+  <PropertyGroup>
+    <WixTargetsPath>C:\Program Files (x86)\MSBuild\Microsoft\WiX\v3.x</WixTargetsPath>
+
+    <OutputType>Package</OutputType>
+    <DefineSolutionProperties>false</DefineSolutionProperties>
+
+    <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
+    <Platform Condition="'$(Platform)'==''">x64</Platform>
+    <OutputName>ATVCompanion</OutputName>
+
+    <!-- Default build output folders (can be overridden on the cmdline if needed) -->
+    <UIBuild Condition="'$(UIBuild)'==''">$(MSBuildProjectDirectory)\..\src\UI\bin\$(Configuration)\net8.0-windows</UIBuild>
+    <CLIBuild Condition="'$(CLIBuild)'==''">$(MSBuildProjectDirectory)\..\src\CLI\bin\$(Configuration)\net8.0</CLIBuild>
+    <ServiceBuild Condition="'$(ServiceBuild)'==''">$(MSBuildProjectDirectory)\..\src\Service\bin\$(Configuration)\net8.0-windows</ServiceBuild>
+
+    <!-- Pass to candle/light as WiX variables -->
+    <DefineConstants>UIBuild=$(UIBuild);CLIBuild=$(CLIBuild);ServiceBuild=$(ServiceBuild)</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Release|x64 -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutputPath>bin\Release\x64\</OutputPath>
+    <IntermediateOutputPath>obj\Release\x64\</IntermediateOutputPath>
+  </PropertyGroup>
+
+  <!-- Release|x86 (optional) -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+    <OutputPath>bin\Release\x86\</OutputPath>
+    <IntermediateOutputPath>obj\Release\x86\</IntermediateOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="**\*.wxs" />
+    <WixLocalization Include="**\*.wxl" />
+  </ItemGroup>
+
+  <!-- WiX extensions (needed for WixUI_InstallDir, etc.) -->
+  <ItemGroup>
+    <WixExtension Include="WixUIExtension" />
+    <WixExtension Include="WixUtilExtension" />
+  </ItemGroup>
+
+  <!-- Import WiX -->
+  <Import Project="$(WixTargetsPath)\Wix.props" Condition="Exists('$(WixTargetsPath)\Wix.props')" />
+  <Import Project="$(WixTargetsPath)\Wix.targets" />
+</Project>

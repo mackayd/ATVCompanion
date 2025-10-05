@@ -1,0 +1,1 @@
+Installer (WiX/MSIX) placeholder.

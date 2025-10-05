@@ -1,0 +1,37 @@
+<Window x:Class="UI.PinPromptWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Enter TV PIN"
+        Width="260" Height="140"
+        WindowStartupLocation="Manual"
+        Left="0" Top="0"
+        Topmost="True"
+        ResizeMode="NoResize"
+        WindowStyle="ToolWindow"
+        ShowInTaskbar="True">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Enter the 4-digit PIN shown on the TV:"
+                   TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <TextBox Grid.Row="1"
+                 x:Name="PinText"
+                 x:FieldModifier="public"
+                 Width="120"
+                 MaxLength="8"
+                 HorizontalAlignment="Left"
+                 VerticalAlignment="Center"
+                 FontSize="16"
+                 Padding="6"
+                 Margin="0,0,0,10"/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Width="70" Margin="0,0,8,0" IsDefault="True" Click="Ok_Click">OK</Button>
+            <Button Width="70" IsCancel="True" Click="Cancel_Click">Cancel</Button>
+        </StackPanel>
+    </Grid>
+</Window>

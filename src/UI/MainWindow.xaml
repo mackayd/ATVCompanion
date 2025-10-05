@@ -1,0 +1,43 @@
+<Window x:Class="UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ATV Companion" Height="380" Width="540"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- IP/MAC -->
+            <RowDefinition Height="Auto"/>  <!-- Buttons -->
+            <RowDefinition Height="Auto"/>  <!-- Console label -->
+            <RowDefinition Height="*"/>     <!-- Console -->
+        </Grid.RowDefinitions>
+
+        <!-- IP / MAC inputs -->
+        <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
+            <TextBlock Text="IP:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="IpBox" Width="150" Margin="0,0,12,0"/>
+            <TextBlock Text="MAC:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="MacBox" Width="170"/>
+        </StackPanel>
+
+        <!-- Control buttons -->
+        <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,8">
+            <Button x:Name="WakeBtn" Content="Wake" Click="WakeButton_Click" Margin="0,0,8,0" Width="90"/>
+            <Button x:Name="PairBtn" Content="Pair" Click="PairButton_Click" Margin="0,0,8,0" Width="90"/>
+            <Button x:Name="StandbyBtn" Content="Standby" Click="StandbyButton_Click" Margin="0,0,8,0" Width="90"/>
+            <Button x:Name="CreateTasksButton" Content="Create Tasks" Click="CreateTasksButton_Click" Width="120"/>
+        </StackPanel>
+
+        <!-- Console label -->
+        <TextBlock Grid.Row="2" Text="Console" FontWeight="Bold" Margin="0,0,0,4"/>
+
+        <!-- Inline console -->
+        <TextBox x:Name="ConsoleBox"
+                 Grid.Row="3"
+                 Margin="0"
+                 IsReadOnly="True"
+                 TextWrapping="Wrap"
+                 AcceptsReturn="True"
+                 VerticalScrollBarVisibility="Auto"/>
+    </Grid>
+</Window>

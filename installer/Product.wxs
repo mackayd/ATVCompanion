@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <Product Id="*" Name="ATVCompanion" Language="1033" Version="1.0.0.0" Manufacturer="ATVCompanion"
+           UpgradeCode="7F3E30B1-5B8F-4B5F-9C0B-6E6AE2A2F0AA">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
+
+    <MajorUpgrade AllowDowngrades="no" Schedule="afterInstallInitialize"
+                  DowngradeErrorMessage="A newer version of ATVCompanion is already installed." />
+
+    <!-- Standard WiX UI that allows choosing InstallDir -->
+    <UIRef Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Feature Id="MainFeature" Title="ATVCompanion" Level="1" Absent="disallow">
+      <!-- App binaries -->
+      <ComponentRef Id="Cmp_UIExe" />
+      <ComponentRef Id="Cmp_UIDll" />
+      <ComponentRef Id="Cmp_UIDeps" />
+      <ComponentRef Id="Cmp_UIRuntimeConfig" />
+      <ComponentRef Id="Cmp_CoreDll" />
+
+      <!-- Shortcuts + menu cleanup -->
+      <ComponentRef Id="Cmp_Shortcuts" />
+      <ComponentRef Id="Cmp_RemoveProgramMenuDir" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="ATVCompanion">
+
+          <!-- One file per component to satisfy ICE/LGHT rules -->
+
+          <!-- UI.exe (versioned) as its own component/keypath -->
+          <Component Id="Cmp_UIExe" Guid="*">
+            <File Id="UIExe" Source="$(var.UIBuild)\UI.exe" KeyPath="yes" />
+          </Component>
+
+          <!-- UI.dll (versioned) -->
+          <Component Id="Cmp_UIDll" Guid="*">
+            <File Id="UIDll" Source="$(var.UIBuild)\UI.dll" KeyPath="yes" />
+          </Component>
+
+          <!-- UI.deps.json (unversioned text/json) -->
+          <Component Id="Cmp_UIDeps" Guid="*">
+            <File Id="UIDeps" Source="$(var.UIBuild)\UI.deps.json" KeyPath="yes" />
+          </Component>
+
+          <!-- UI.runtimeconfig.json (unversioned text/json) -->
+          <Component Id="Cmp_UIRuntimeConfig" Guid="*">
+            <File Id="UIRuntimeConfig" Source="$(var.UIBuild)\UI.runtimeconfig.json" KeyPath="yes" />
+          </Component>
+
+          <!-- Core.dll (versioned) -->
+          <Component Id="Cmp_CoreDll" Guid="*">
+            <File Id="CoreDll" Source="$(var.UIBuild)\Core.dll" KeyPath="yes" />
+          </Component>
+
+          <!-- Per-user Start Menu shortcut in separate HKCU-keypathed component (ICE38/43/57 compliant) -->
+          <Component Id="Cmp_Shortcuts" Guid="*">
+            <RegistryValue Id="Reg_UserKey_ShortcutsKeyPath" Root="HKCU"
+                           Key="Software\ATVCompanion" Name="Installed" Value="1" Type="integer" KeyPath="yes"/>
+            <Shortcut Id="StartMenuShortcut"
+                      Directory="ProgramMenuDir"
+                      Name="ATVCompanion"
+                      Description="Wake, pair, and standby your TV"
+                      WorkingDirectory="INSTALLFOLDER"
+                      Target="[INSTALLFOLDER]UI.exe" />
+            <RemoveFile Id="RemoveOldShortcut" Directory="ProgramMenuDir" Name="ATVCompanion.lnk" On="uninstall" />
+          </Component>
+
+        </Directory>
+      </Directory>
+
+      <!-- Start Menu folder (per-user) -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ProgramMenuDir" Name="ATVCompanion">
+          <Component Id="Cmp_RemoveProgramMenuDir" Guid="*">
+            <RegistryValue Id="Reg_UserKey_MenuDirKeyPath" Root="HKCU"
+                           Key="Software\ATVCompanion" Name="Menu" Value="1" Type="integer" KeyPath="yes"/>
+            <RemoveFolder Id="RemoveProgramMenuDir" On="uninstall"/>
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+
+  </Product>
+</Wix>
