@@ -246,6 +246,10 @@ Use Task Scheduler GUI if preferred (`CLI.exe wake` or `CLI.exe standby`).
 
 ## Troubleshooting
 
+
+**Philips overlay screensaver keeps appearing**
+See the step‑by‑step guide: [Disable the Philips built‑in screen saver](docs/philips-disable-screensaver.md).
+
 **Philips: Pair → “404 Not Found”**  
 You’re likely hitting the wrong API route/version. We use:
 
