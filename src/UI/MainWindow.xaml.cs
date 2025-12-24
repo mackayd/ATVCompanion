@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using Core.Config; // NEW: load persisted config (Ip, Mac, Manufacturer)
 
 namespace UI
 {
@@ -17,6 +18,38 @@ namespace UI
         public MainWindow()
         {
             InitializeComponent();
+
+            // >>> NEW: Restore saved config (Ip, Mac, Manufacturer) into UI <<<
+            try
+            {
+                var cfg = ConfigStore.Load();
+                if (cfg != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(cfg.Ip) && FindName("IpBox") is TextBox ipBox)
+                        ipBox.Text = cfg.Ip;
+
+                    if (!string.IsNullOrWhiteSpace(cfg.Mac) && FindName("MacBox") is TextBox macBox)
+                        macBox.Text = cfg.Mac;
+
+                    if (FindName("BrandBox") is ComboBox brandBox)
+                    {
+                        var brand = string.IsNullOrWhiteSpace(cfg.Manufacturer) ? "Philips" : cfg.Manufacturer!;
+                        brandBox.SelectedValue = brand;
+                    }
+                }
+                else
+                {
+                    if (FindName("BrandBox") is ComboBox brandBox)
+                        brandBox.SelectedValue = "Philips";
+                }
+            }
+            catch
+            {
+                // Keep UI running even if config read fails
+                if (FindName("BrandBox") is ComboBox brandBox)
+                    brandBox.SelectedValue = "Philips";
+            }
+            // <<< END NEW >>>
 
             Current = this;
             Loaded += OnLoadedBringToFrontAndCenter;

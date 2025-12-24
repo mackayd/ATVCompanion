@@ -24,11 +24,25 @@ namespace UI
             try { return FindName(name) as TextBox; } catch { return null; }
         }
 
+        private ComboBox? GetComboBox(string name)
+        {
+            try { return FindName(name) as ComboBox; } catch { return null; }
+        }
+
         private (string ip, string mac) GetIpMac()
         {
             var ip  = GetTextBox("IpBox")?.Text?.Trim()  ?? "";
             var mac = GetTextBox("MacBox")?.Text?.Trim() ?? "";
             return (ip, mac);
+        }
+
+        private string GetBrand()
+        {
+            var cb = GetComboBox("BrandBox");
+            var v = cb?.SelectedValue?.ToString()?.Trim();
+            if (string.IsNullOrWhiteSpace(v)) return "Philips";
+            // Normalize
+            return v.Equals("Sony", StringComparison.OrdinalIgnoreCase) ? "Sony" : "Philips";
         }
 
         private static void ShowError(string message)
@@ -111,62 +125,60 @@ namespace UI
             public PairReqDevice device { get; set; } = new PairReqDevice();
         }
 
-     
-
-       private static async Task<(bool ok, string? timestamp, string? authKey, string? err)>
-    PhilipsPairRequestAsync(string ip, string deviceId, CancellationToken ct = default)
-{
-    try
-    {
-        using var http = NewHttpV6($"https://{ip}:1926/");
-
-        var body = new PairRequestBody
+        private static async Task<(bool ok, string? timestamp, string? authKey, string? err)>
+            PhilipsPairRequestAsync(string ip, string deviceId, CancellationToken ct = default)
         {
-            device = new PairReqDevice { id = deviceId }
-        };
+            try
+            {
+                using var http = NewHttpV6($"https://{ip}:1926/");
 
-        var json = JsonSerializer.Serialize(body);
-        var res  = await http.PostAsync("6/pair/request",
-                     new StringContent(json, Encoding.UTF8, "application/json"), ct);
-        var txt  = await res.Content.ReadAsStringAsync(ct);
+                var body = new PairRequestBody
+                {
+                    device = new PairReqDevice { id = deviceId }
+                };
 
-        if (!res.IsSuccessStatusCode)
-            return (false, null, null, $"Pair request rejected: {(int)res.StatusCode} {res.ReasonPhrase} - {TrimHtml(txt)}");
+                var json = JsonSerializer.Serialize(body);
+                var res  = await http.PostAsync("6/pair/request",
+                             new StringContent(json, Encoding.UTF8, "application/json"), ct);
+                var txt  = await res.Content.ReadAsStringAsync(ct);
 
-        // Robust parse: timestamp may be number or string depending on TV firmware
-        using var doc = JsonDocument.Parse(txt);
-        var root = doc.RootElement;
+                if (!res.IsSuccessStatusCode)
+                    return (false, null, null, $"Pair request rejected: {(int)res.StatusCode} {res.ReasonPhrase} - {TrimHtml(txt)}");
 
-        if (!root.TryGetProperty("timestamp", out var tsEl) ||
-            !root.TryGetProperty("auth_key",  out var akEl))
-        {
-            return (false, null, null, "Unexpected /pair/request response: " + txt);
+                // Robust parse: timestamp may be number or string depending on TV firmware
+                using var doc = JsonDocument.Parse(txt);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty("timestamp", out var tsEl) ||
+                    !root.TryGetProperty("auth_key",  out var akEl))
+                {
+                    return (false, null, null, "Unexpected /pair/request response: " + txt);
+                }
+
+                string? ts = tsEl.ValueKind switch
+                {
+                    JsonValueKind.String => tsEl.GetString(),
+                    JsonValueKind.Number => tsEl.GetRawText(), // keep numeric as string
+                    _ => null
+                };
+
+                string? authKey = akEl.ValueKind switch
+                {
+                    JsonValueKind.String => akEl.GetString(),
+                    JsonValueKind.Number => akEl.GetRawText(),
+                    _ => null
+                };
+
+                if (string.IsNullOrWhiteSpace(ts) || string.IsNullOrWhiteSpace(authKey))
+                    return (false, null, null, "Invalid /pair/request values: " + txt);
+
+                return (true, ts, authKey, null);
+            }
+            catch (Exception ex)
+            {
+                return (false, null, null, "Pair request failed: " + ex.Message);
+            }
         }
-
-        string? ts = tsEl.ValueKind switch
-        {
-            JsonValueKind.String => tsEl.GetString(),
-            JsonValueKind.Number => tsEl.GetRawText(), // keep numeric as string
-            _ => null
-        };
-
-        string? authKey = akEl.ValueKind switch
-        {
-            JsonValueKind.String => akEl.GetString(),
-            JsonValueKind.Number => akEl.GetRawText(),
-            _ => null
-        };
-
-        if (string.IsNullOrWhiteSpace(ts) || string.IsNullOrWhiteSpace(authKey))
-            return (false, null, null, "Invalid /pair/request values: " + txt);
-
-        return (true, ts, authKey, null);
-    }
-    catch (Exception ex)
-    {
-        return (false, null, null, "Pair request failed: " + ex.Message);
-    }
-}
 
         private static string ComputeV6Signature(string timestamp, string pin)
         {
@@ -225,6 +237,52 @@ namespace UI
             catch (Exception ex)
             {
                 return (false, "Grant failed: " + ex.Message);
+            }
+        }
+
+        // ===== Sony helpers (JSON-RPC / PSK) ==================================
+
+        private static async Task<bool> SonyProbeAsync(string ip, string? psk, CancellationToken ct = default)
+        {
+            try
+            {
+                using var http = new HttpClient
+                {
+                    BaseAddress = new Uri($"http://{ip}/"),
+                    Timeout = TimeSpan.FromSeconds(8)
+                };
+
+                var req = new HttpRequestMessage(HttpMethod.Post, "sony/system");
+                req.Content = new StringContent("{\"method\":\"getPowerStatus\",\"id\":1,\"params\":[],\"version\":\"1.0\"}", Encoding.UTF8, "application/json");
+                if (!string.IsNullOrWhiteSpace(psk)) req.Headers.Add("X-Auth-PSK", psk);
+                using var resp = await http.SendAsync(req, ct);
+                return resp.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static async Task<bool> SonyPowerOffAsync(string ip, string? psk, CancellationToken ct = default)
+        {
+            try
+            {
+                using var http = new HttpClient
+                {
+                    BaseAddress = new Uri($"http://{ip}/"),
+                    Timeout = TimeSpan.FromSeconds(8)
+                };
+
+                var req = new HttpRequestMessage(HttpMethod.Post, "sony/system");
+                req.Content = new StringContent("{\"method\":\"setPowerStatus\",\"id\":1,\"params\":[{\"status\":false}],\"version\":\"1.0\"}", Encoding.UTF8, "application/json");
+                if (!string.IsNullOrWhiteSpace(psk)) req.Headers.Add("X-Auth-PSK", psk);
+                using var resp = await http.SendAsync(req, ct);
+                return resp.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -291,12 +349,58 @@ namespace UI
             return pin;
         }
 
+        private static string? PromptForPsk(Window owner)
+        {
+            var w = new Window
+            {
+                Title = "Sony BRAVIA PSK",
+                Width = 300,
+                Height = 140,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                Topmost = true,
+                Owner = owner
+            };
+
+            var grid = new Grid { Margin = new Thickness(10) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var lbl = new TextBlock { Text = "Enter TV Pre-Shared Key (PSK):", Margin = new Thickness(0, 0, 0, 6) };
+            Grid.SetRow(lbl, 0);
+            grid.Children.Add(lbl);
+
+            var tb = new TextBox { Margin = new Thickness(0, 0, 0, 10), MaxLength = 32 };
+            Grid.SetRow(tb, 1);
+            grid.Children.Add(tb);
+
+            var panel  = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var ok     = new Button { Content = "OK", Width = 60, Margin = new Thickness(0, 0, 6, 0), IsDefault = true };
+            var cancel = new Button { Content = "Cancel", Width = 60, IsCancel = true };
+            panel.Children.Add(ok);
+            panel.Children.Add(cancel);
+            Grid.SetRow(panel, 2);
+            grid.Children.Add(panel);
+
+            string? psk = null;
+            ok.Click += (_, __) => { psk = tb.Text?.Trim(); w.DialogResult = true; };
+            cancel.Click += (_, __) => { psk = null; w.DialogResult = false; };
+
+            w.Content = grid;
+            w.Loaded += (_, __) => { tb.Focus(); Keyboard.Focus(tb); };
+            w.ShowDialog();
+
+            return psk;
+        }
+
         // ===== Button handlers =================================================
 
         private async void PairButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                var brand = GetBrand();
                 var (ip, mac) = GetIpMac();
                 if (string.IsNullOrWhiteSpace(ip))
                 {
@@ -304,14 +408,51 @@ namespace UI
                     return;
                 }
 
-                var cfg = ConfigStore.Load() ?? new AppConfig();
-                if (string.IsNullOrWhiteSpace(cfg.DeviceId))
-                    cfg.DeviceId = GenerateDeviceId();
+                if (brand == "Sony")
+                {
+                    // --- Sony "pair" means capture PSK and verify it works ---
+                    var psk = ConfigStore.Load()?.AuthKey;
+                    if (string.IsNullOrWhiteSpace(psk))
+                    {
+                        psk = PromptForPsk(this);
+                        if (string.IsNullOrWhiteSpace(psk))
+                        {
+                            Log.Info("Pairing cancelled.");
+                            return;
+                        }
+                    }
+
+                    Log.Info($"Starting Sony verification with {ip} ...");
+                    var ok = await SonyProbeAsync(ip, psk);
+                    if (!ok)
+                    {
+                        ShowError("Could not reach the Sony TV or PSK invalid. Make sure 'Pre-Shared Key' is enabled on the TV (Network → Home Network Setup → IP control) and try again.");
+                        return;
+                    }
+
+                    // Save config
+                    var cfg = ConfigStore.Load() ?? new AppConfig();
+                    cfg.Ip = ip;
+                    if (!string.IsNullOrWhiteSpace(mac)) cfg.Mac = mac;
+                    cfg.Manufacturer = "Sony";
+                    cfg.AuthKey = psk;           // store PSK here
+                    cfg.DeviceId = null;         // not used for Sony
+                    ConfigStore.Save(cfg);
+
+                    Log.Info("Sony verified and saved.");
+                    MessageBox.Show("Sony TV verified.\nPSK saved for future operations.", "ATV Companion", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // --- Philips flow (existing) ---
+                var cfgPhilips = ConfigStore.Load() ?? new AppConfig();
+                if (string.IsNullOrWhiteSpace(cfgPhilips.DeviceId))
+                    cfgPhilips.DeviceId = GenerateDeviceId();
 
                 Log.Info($"Starting pairing with {ip} ...");
 
                 // 1) request -> timestamp + auth_key
-                var (okReq, ts, authKey, errReq) = await PhilipsPairRequestAsync(ip, cfg.DeviceId!);
+                var (okReq, ts, authKey, errReq) = await PhilipsPairRequestAsync(ip, cfgPhilips.DeviceId!);
                 if (!okReq || string.IsNullOrWhiteSpace(ts) || string.IsNullOrWhiteSpace(authKey))
                 {
                     ShowError(errReq ?? "Pair request failed.");
@@ -326,7 +467,7 @@ namespace UI
                     return;
                 }
 
-                var (okGrant, errGrant) = await PhilipsPairGrantAsync(ip, cfg.DeviceId!, pin!, ts!, authKey!);
+                var (okGrant, errGrant) = await PhilipsPairGrantAsync(ip, cfgPhilips.DeviceId!, pin!, ts!, authKey!);
                 if (!okGrant)
                 {
                     ShowError("The TV did not accept the pairing request. Is JointSpace enabled?\n\n" + (errGrant ?? "Unknown error"));
@@ -334,10 +475,11 @@ namespace UI
                 }
 
                 // Success: save creds
-                cfg.Ip = ip;
-                if (!string.IsNullOrWhiteSpace(mac)) cfg.Mac = mac;
-                cfg.AuthKey = authKey!;
-                ConfigStore.Save(cfg);
+                cfgPhilips.Ip = ip;
+                if (!string.IsNullOrWhiteSpace(mac)) cfgPhilips.Mac = mac;
+                cfgPhilips.AuthKey = authKey!;
+                cfgPhilips.Manufacturer = "Philips";
+                ConfigStore.Save(cfgPhilips);
 
                 Log.Info("Paired successfully. Credentials saved.");
                 MessageBox.Show("Paired successfully.\nCredentials saved for future operations.",
@@ -382,6 +524,25 @@ namespace UI
             try
             {
                 var cfg = ConfigStore.Load();
+                var brand = GetBrand();
+
+                if (brand == "Sony")
+                {
+                    if (cfg == null || string.IsNullOrWhiteSpace(cfg.Ip) || string.IsNullOrWhiteSpace(cfg.AuthKey))
+                    {
+                        ShowError("Sony TV not configured. Use Pair to enter PSK first.");
+                        return;
+                    }
+
+                    var ok = await SonyPowerOffAsync(cfg.Ip!, cfg.AuthKey!);
+                    if (ok)
+                        Log.Info("Sony: TV put into standby.");
+                    else
+                        ShowError("Sony standby failed. Check PSK and network access.");
+                    return;
+                }
+
+                // Philips
                 if (cfg == null || string.IsNullOrWhiteSpace(cfg.Ip) ||
                     string.IsNullOrWhiteSpace(cfg.DeviceId) || string.IsNullOrWhiteSpace(cfg.AuthKey))
                 {
@@ -399,7 +560,7 @@ namespace UI
                 var txt  = await res.Content.ReadAsStringAsync();
 
                 if (res.IsSuccessStatusCode)
-                    Log.Info("TV put into standby.");
+                    Log.Info("Philips: TV put into standby.");
                 else
                     ShowError($"Standby failed: {(int)res.StatusCode} {res.ReasonPhrase}\n{TrimHtml(txt)}");
             }
