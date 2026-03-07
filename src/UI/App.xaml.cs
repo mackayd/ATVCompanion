@@ -12,7 +12,7 @@ namespace UI
             base.OnStartup(e);
             try
             {
-                // Touch the config store so %ProgramData%\ATVCompanion exists early.
+                // Touch the config store so %ProgramData%\CompanDroid exists early.
                 var cfg = ConfigStore.Load();
                 if (cfg == null)
                 {

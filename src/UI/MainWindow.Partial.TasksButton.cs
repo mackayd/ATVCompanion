@@ -15,7 +15,7 @@ namespace UI
             var cfg = ConfigStore.Load();
             if (cfg == null || string.IsNullOrWhiteSpace(cfg.DeviceId) || string.IsNullOrWhiteSpace(cfg.AuthKey))
             {
-                MessageBox.Show("No configuration found. Pair the app with the TV first.", "ATVCompanion", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("No configuration found. Pair the app with the TV first.", "CompanDroid", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -23,19 +23,20 @@ namespace UI
             string cliPath = Path.Combine(AppContext.BaseDirectory, "CLI.exe");
             if (!File.Exists(cliPath))
             {
-                MessageBox.Show($"CLI tool not found:\n{cliPath}", "ATVCompanion", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"CLI tool not found:\n{cliPath}", "CompanDroid", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
             // NOTE: CreateTasks(out string output, string cliPath)
             if (ScheduledTaskCreator.CreateTasks(out string output, cliPath))
             {
-                MessageBox.Show("Scheduled tasks created.\n\n" + output, "ATVCompanion", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Scheduled tasks created.\n\n" + output, "CompanDroid", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
-                MessageBox.Show("Failed to create tasks.\n\n" + output, "ATVCompanion", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Failed to create tasks.\n\n" + output, "CompanDroid", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
 }
+

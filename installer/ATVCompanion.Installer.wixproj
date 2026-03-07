@@ -8,7 +8,7 @@
 
     <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
     <Platform Condition="'$(Platform)'==''">x64</Platform>
-    <OutputName>ATVCompanion</OutputName>
+    <OutputName>CompanDroid</OutputName>
 
     <!-- Default build output folders (can be overridden on the cmdline if needed) -->
     <UIBuild Condition="'$(UIBuild)'==''">$(MSBuildProjectDirectory)\..\src\UI\bin\$(Configuration)\net8.0-windows</UIBuild>
@@ -46,3 +46,4 @@
   <Import Project="$(WixTargetsPath)\Wix.props" Condition="Exists('$(WixTargetsPath)\Wix.props')" />
   <Import Project="$(WixTargetsPath)\Wix.targets" />
 </Project>
+

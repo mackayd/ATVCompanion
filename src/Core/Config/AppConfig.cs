@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Core.Config
 {
     /// <summary>
-    /// Persisted configuration for ATVCompanion.
+    /// Persisted configuration for CompanDroid.
     /// </summary>
     public class AppConfig
     {
@@ -24,3 +24,4 @@ namespace Core.Config
         public string? Manufacturer { get; set; }
     }
 }
+

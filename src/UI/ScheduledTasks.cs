@@ -11,7 +11,7 @@ namespace UI
     /// </summary>
     public static class ScheduledTasks
     {
-        private const string TaskName = "ATVCompanion_AutoStart";
+        private const string TaskName = "CompanDroid_AutoStart";
 
         public static bool CreateOrUpdateAutoStartTask(out string message)
         {
@@ -104,3 +104,4 @@ namespace UI
         }
     }
 }
+

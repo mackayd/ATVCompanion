@@ -8,9 +8,10 @@ namespace UI
     public static class ScheduledTaskCreator
     {
         /// <summary>
-        /// Creates two Windows Scheduled Tasks that call the CLI directly:
-        ///  - ATVCompanion_WakeDaily at 07:00 -> CLI.exe wake
-        ///  - ATVCompanion_StandbyDaily at 23:30 -> CLI.exe standby
+        /// Creates Windows Scheduled Tasks that call the CLI directly:
+        ///  - CompanDroid_WakeOnStartup -> triggered ONSTART -> CLI.exe wake
+        ///  - CompanDroid_Standby_OnSystem1074 -> triggered on System/User32 EventID 1074 -> CLI.exe standby
+        ///  - CompanDroid_Standby_OnSecurity4647 -> triggered on Security EventID 4647 -> CLI.exe standby
         ///
         /// Requires an elevated (Administrator) process to succeed.
         /// Returns true on success; 'output' has a full transcript.
@@ -28,7 +29,6 @@ namespace UI
 
             try
             {
-                // ---- Locate CLI.exe (we require the EXE; we do not support .dll here) ----
                 if (!TryResolveCliExe(cliPath, out var cliExe, out var reason))
                 {
                     sb.AppendLine("CLI tool not found.");
@@ -39,39 +39,42 @@ namespace UI
                     return false;
                 }
 
-                // ---- Build two tasks that call the CLI directly ----
-                // Adjust times if you want different defaults.
-                const string wakeTaskName = "ATVCompanion_WakeDaily";
-                const string standbyTaskName = "ATVCompanion_StandbyDaily";
-                const string wakeTime = "07:00";
-                const string standbyTime = "23:30";
+                const string wakeTaskName = "CompanDroid_WakeOnStartup";
+                const string standbyTaskSystem1074 = "CompanDroid_Standby_OnSystem1074";
+                const string standbyTaskSecurity4647 = "CompanDroid_Standby_OnSecurity4647";
 
-                // /TR needs one full command line. We quote the exe path and pass the verb.
                 var wakeTR = $"\"{cliExe}\" wake";
                 var standbyTR = $"\"{cliExe}\" standby";
 
-                // Create/overwrite the tasks, run as SYSTEM with highest privileges.
-                // NOTE: This requires the current process to be elevated.
-                var wakeArgs =
-                    $"/Create /F /RL HIGHEST /RU SYSTEM /SC DAILY /TN \"{wakeTaskName}\" /TR \"{wakeTR}\" /ST {wakeTime}";
-                var standbyArgs =
-                    $"/Create /F /RL HIGHEST /RU SYSTEM /SC DAILY /TN \"{standbyTaskName}\" /TR \"{standbyTR}\" /ST {standbyTime}";
+                const string system1074Query = "*[System[Provider[@Name='User32'] and EventID=1074]]";
+                const string security4647Query = "*[System[EventID=4647]]";
 
-                var okWake = Run("schtasks", wakeArgs, sb);
-                var okStandby = Run("schtasks", standbyArgs, sb);
+                var okWake = Run("schtasks", sb,
+                    "/Create", "/F", "/RL", "HIGHEST", "/RU", "SYSTEM",
+                    "/SC", "ONSTART", "/TN", wakeTaskName, "/TR", wakeTR);
 
-                if (okWake && okStandby)
+                var okStandbySystem = Run("schtasks", sb,
+                    "/Create", "/F", "/RL", "HIGHEST", "/RU", "SYSTEM",
+                    "/SC", "ONEVENT", "/EC", "System", "/MO", system1074Query,
+                    "/TN", standbyTaskSystem1074, "/TR", standbyTR);
+
+                var okStandbySecurity = Run("schtasks", sb,
+                    "/Create", "/F", "/RL", "HIGHEST", "/RU", "SYSTEM",
+                    "/SC", "ONEVENT", "/EC", "Security", "/MO", security4647Query,
+                    "/TN", standbyTaskSecurity4647, "/TR", standbyTR);
+
+                if (okWake && okStandbySystem && okStandbySecurity)
                 {
                     sb.AppendLine("Scheduled tasks created/updated successfully.");
-                    sb.AppendLine($"  - {wakeTaskName} @ {wakeTime}  -> {wakeTR}");
-                    sb.AppendLine($"  - {standbyTaskName} @ {standbyTime} -> {standbyTR}");
+                    sb.AppendLine($"  - {wakeTaskName} (ONSTART) -> {wakeTR}");
+                    sb.AppendLine($"  - {standbyTaskSystem1074} (System/User32/1074) -> {standbyTR}");
+                    sb.AppendLine($"  - {standbyTaskSecurity4647} (Security/4647) -> {standbyTR}");
                     sb.AppendLine();
                     sb.AppendLine("Note: The CLI reads its config (IP/MAC/auth) from your shared ConfigStore.");
                     output = sb.ToString().TrimEnd();
                     return true;
                 }
 
-                // If either failed, include transcript for debugging.
                 sb.AppendLine();
                 sb.AppendLine("One or more schtasks commands failed. If you see 'Access is denied', run UI as Administrator.");
                 output = sb.ToString().TrimEnd();
@@ -87,13 +90,13 @@ namespace UI
 
         // ---- helpers --------------------------------------------------------
 
-        private static bool Run(string file, string args, StringBuilder log)
+        private static bool Run(string file, StringBuilder log, params string[] args)
         {
-            log.AppendLine($"> {file} {args}");
+            log.AppendLine($"> {file} {FormatArgsForLog(args)}");
+
             var psi = new ProcessStartInfo
             {
                 FileName = file,
-                Arguments = args,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -101,15 +104,37 @@ namespace UI
                 WorkingDirectory = AppContext.BaseDirectory
             };
 
+            foreach (var arg in args)
+            {
+                psi.ArgumentList.Add(arg);
+            }
+
             using var p = Process.Start(psi)!;
             var so = p.StandardOutput.ReadToEnd();
             var se = p.StandardError.ReadToEnd();
             p.WaitForExit();
+
             if (!string.IsNullOrWhiteSpace(so)) log.AppendLine(so.TrimEnd());
             if (!string.IsNullOrWhiteSpace(se)) log.AppendLine(se.TrimEnd());
+
             log.AppendLine($"ExitCode: {p.ExitCode}");
             log.AppendLine();
             return p.ExitCode == 0;
+        }
+
+        private static string FormatArgsForLog(string[] args)
+        {
+            static string QuoteIfNeeded(string value) =>
+                value.Contains(' ') ? $"\"{value}\"" : value;
+
+            var sb = new StringBuilder();
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (i > 0) sb.Append(' ');
+                sb.Append(QuoteIfNeeded(args[i]));
+            }
+
+            return sb.ToString();
         }
 
         private static bool TryResolveCliExe(string? hint, out string cliExe, out string reason)
@@ -117,7 +142,6 @@ namespace UI
             cliExe = string.Empty;
             reason = string.Empty;
 
-            // 1) If caller provided an explicit path
             if (!string.IsNullOrWhiteSpace(hint))
             {
                 var full = Path.GetFullPath(hint);
@@ -130,7 +154,6 @@ namespace UI
                 return false;
             }
 
-            // 2) Next to UI.exe (publish scenario)
             var baseDir = AppContext.BaseDirectory;
             var nextToUi = Path.Combine(baseDir, "CLI.exe");
             if (File.Exists(nextToUi))
@@ -139,13 +162,12 @@ namespace UI
                 return true;
             }
 
-            // 3) Dev layout: ...\src\UI\bin\<Config>\net8.0-windows\  ->  ...\src\CLI\bin\<Config>\net8.0\
             try
             {
                 var uiOut = new DirectoryInfo(baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-                var config = uiOut.Parent?.Name ?? "Release";              // e.g., "Release"
-                var uiBin = uiOut.Parent?.Parent;                          // ...\src\UI\bin
-                var src = uiBin?.Parent?.Parent;                           // ...\src
+                var config = uiOut.Parent?.Name ?? "Release";
+                var uiBin = uiOut.Parent?.Parent;
+                var src = uiBin?.Parent?.Parent;
                 if (src != null)
                 {
                     foreach (var cfg in new[] { config, "Release", "Debug" })

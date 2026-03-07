@@ -47,7 +47,7 @@ namespace Service
                 Console.WriteLine($"SystemEvents hookup failed: {ex.Message}");
             }
 
-            Console.WriteLine("ATVCompanion Service started. Press Ctrl+C to exit.");
+            Console.WriteLine("CompanDroid Service started. Press Ctrl+C to exit.");
             while (_running)
             {
                 await Task.Delay(250);
@@ -127,3 +127,4 @@ namespace Service
         }
     }
 }
+

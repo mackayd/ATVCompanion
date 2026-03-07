@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Net.Sockets;
+using System.Globalization;
 using Core.Config; // AppConfig + ConfigStore
 
 namespace UI
@@ -48,7 +49,7 @@ namespace UI
         private static void ShowError(string message)
         {
             Log.Error(message);
-            MessageBox.Show(message, "ATV Companion", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(message, "CompanDroid", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
         // ===== Wake-on-LAN =====================================================
@@ -58,13 +59,25 @@ namespace UI
             if (string.IsNullOrWhiteSpace(mac))
                 throw new ArgumentException("MAC address is required.", nameof(mac));
 
-            var hex = mac.Replace("-", "").Replace(":", "").Trim();
-            if (hex.Length != 12)
+            Span<char> cleanMac = stackalloc char[12];
+            var cleanLen = 0;
+            foreach (var ch in mac)
+            {
+                if (ch is ':' or '-' or '.' || char.IsWhiteSpace(ch)) continue;
+                if (cleanLen >= cleanMac.Length)
+                    throw new ArgumentException("Invalid MAC address format. Expected 6 bytes.", nameof(mac));
+                cleanMac[cleanLen++] = ch;
+            }
+
+            if (cleanLen != 12)
                 throw new ArgumentException("Invalid MAC address format. Expected 6 bytes.", nameof(mac));
 
             var macBytes = new byte[6];
             for (int i = 0; i < 6; i++)
-                macBytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+            {
+                if (!byte.TryParse(cleanMac.Slice(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out macBytes[i]))
+                    throw new ArgumentException("Invalid MAC address format. Expected hex bytes.", nameof(mac));
+            }
 
             var packet = new byte[6 + (16 * 6)];
             for (int i = 0; i < 6; i++) packet[i] = 0xFF;
@@ -111,9 +124,9 @@ namespace UI
 
         private sealed class PairReqDevice
         {
-            public string device_name { get; set; } = "ATVCompanion";
+            public string device_name { get; set; } = "CompanDroid";
             public string device_os   { get; set; } = "Windows";
-            public string app_name    { get; set; } = "ATVCompanion";
+            public string app_name    { get; set; } = "CompanDroid";
             public string type        { get; set; } = "native";
             public string app_id      { get; set; } = "app.id";
             public string id          { get; set; } = "";
@@ -297,7 +310,7 @@ namespace UI
         private static string GenerateDeviceId()
         {
             const string alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            var rng  = new Random();
+            var rng = Random.Shared;
             var buf = new char[16];
             for (int i = 0; i < buf.Length; i++) buf[i] = alphabet[rng.Next(alphabet.Length)];
             return new string(buf);
@@ -440,7 +453,7 @@ namespace UI
                     ConfigStore.Save(cfg);
 
                     Log.Info("Sony verified and saved.");
-                    MessageBox.Show("Sony TV verified.\nPSK saved for future operations.", "ATV Companion", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Sony TV verified.\nPSK saved for future operations.", "CompanDroid", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
@@ -483,7 +496,7 @@ namespace UI
 
                 Log.Info("Paired successfully. Credentials saved.");
                 MessageBox.Show("Paired successfully.\nCredentials saved for future operations.",
-                    "ATV Companion", MessageBoxButton.OK, MessageBoxImage.Information);
+                    "CompanDroid", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -571,3 +584,4 @@ namespace UI
         }
     }
 }
+

@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -19,6 +20,34 @@ namespace CLI
 
     internal static class Program
     {
+        private static readonly JsonSerializerOptions ConfigJsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        private static readonly string[] ConfigPaths =
+        {
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "CompanDroid",
+                "Config.json"),
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "CompanDroid",
+                "AppConfig.json"),
+            // Backward compatibility with older app name/location.
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "ATVCompanion",
+                "Config.json"),
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "ATVCompanion",
+                "AppConfig.json"),
+            Path.Combine(AppContext.BaseDirectory, "Config.json"),
+            Path.Combine(AppContext.BaseDirectory, "AppConfig.json")
+        };
+
         static async Task<int> Main(string[] args)
         {
             if (args.Length == 0 || HasHelp(args))
@@ -52,14 +81,14 @@ namespace CLI
         static void PrintHelp()
         {
             Console.WriteLine(
-@"ATV Companion CLI
+@"CompanDroid CLI
 
 Usage:
   CLI.exe wake [--mac <MAC>] [--bcast <IP>] [--port <PORT>]
   CLI.exe standby [--ip <IP>] [--user <DEVICE_ID>] [--pass <AUTH_KEY>]
 
 Notes:
-  - Missing flags are loaded from %ProgramData%\ATVCompanion\Config.json (AppConfig.json is also accepted).
+  - Missing flags are loaded from %ProgramData%\CompanDroid\Config.json (legacy ATVCompanion paths are also accepted).
   - 'standby' posts https://<ip>:1926/6/input/key { ""key"": ""Standby"" } with Digest auth.
 ");
         }
@@ -72,28 +101,9 @@ Notes:
             return null;
         }
 
-        static string ProgramDataDir =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "ATVCompanion");
-
-        static string[] CandidateConfigPaths()
-        {
-            // Primary: Config.json (what the UI writes)
-            // Fallbacks: AppConfig.json, plus local folder for dev runs
-            var list = new[]
-            {
-                Path.Combine(ProgramDataDir, "Config.json"),
-                Path.Combine(ProgramDataDir, "AppConfig.json"),
-                Path.Combine(AppContext.BaseDirectory, "Config.json"),
-                Path.Combine(AppContext.BaseDirectory, "AppConfig.json")
-            };
-            return list;
-        }
-
         static AppConfig? LoadConfig()
         {
-            var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-            foreach (var path in CandidateConfigPaths())
+            foreach (var path in ConfigPaths)
             {
                 try
                 {
@@ -102,7 +112,7 @@ Notes:
                     if (string.IsNullOrWhiteSpace(json)) continue;
 
                     // Accept snake_case keys too (device_id/auth_key) via case-insensitive matching
-                    var cfg = JsonSerializer.Deserialize<AppConfig>(json, opts);
+                    var cfg = JsonSerializer.Deserialize<AppConfig>(json, ConfigJsonOptions);
                     if (cfg != null)
                     {
                         // Also try to extract snake_case manually if standard props are empty.
@@ -129,12 +139,12 @@ Notes:
             return null;
         }
 
-        static async Task<int> RunWake(string[] args)
+        static Task<int> RunWake(string[] args)
         {
             var cfg = LoadConfig();
             var mac = Flag(args, "--mac") ?? cfg?.Mac;
             if (string.IsNullOrWhiteSpace(mac))
-                return Fail("Missing --mac <MAC> and no saved MAC in config.");
+                return Task.FromResult(Fail("Missing --mac <MAC> and no saved MAC in config."));
 
             var bcast = Flag(args, "--bcast");
             if (string.IsNullOrWhiteSpace(bcast))
@@ -151,22 +161,34 @@ Notes:
             var portStr = Flag(args, "--port");
             int port = 9;
             if (!string.IsNullOrWhiteSpace(portStr) && !int.TryParse(portStr, out port))
-                return Fail("Invalid --port value.");
+                return Task.FromResult(Fail("Invalid --port value."));
 
             SendMagicPacket(mac!, bcast!, port);
             Console.WriteLine("Wake signal sent.");
-            return 0;
+            return Task.FromResult(0);
         }
 
         static void SendMagicPacket(string mac, string broadcast, int port)
         {
             static byte[] ParseMac(string s)
             {
-                var clean = s.Replace(":", "").Replace("-", "").Replace(".", "").Trim();
-                if (clean.Length != 12) throw new ArgumentException("MAC must be 12 hex digits.");
+                Span<char> clean = stackalloc char[12];
+                var cleanLen = 0;
+                foreach (var ch in s)
+                {
+                    if (ch is ':' or '-' or '.' || char.IsWhiteSpace(ch)) continue;
+                    if (cleanLen >= clean.Length) throw new ArgumentException("MAC must be 12 hex digits.");
+                    clean[cleanLen++] = ch;
+                }
+
+                if (cleanLen != 12) throw new ArgumentException("MAC must be 12 hex digits.");
+
                 var bytes = new byte[6];
                 for (int i = 0; i < 6; i++)
-                    bytes[i] = Convert.ToByte(clean.Substring(i * 2, 2), 16);
+                {
+                    if (!byte.TryParse(clean.Slice(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out bytes[i]))
+                        throw new ArgumentException("MAC contains invalid hex characters.");
+                }
                 return bytes;
             }
 

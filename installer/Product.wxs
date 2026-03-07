@@ -2,12 +2,12 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
      xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
 
-  <Product Id="*" Name="ATVCompanion" Language="1033" Version="1.0.0.0" Manufacturer="ATVCompanion"
+  <Product Id="*" Name="CompanDroid" Language="1033" Version="1.0.1.0" Manufacturer="CompanDroid"
            UpgradeCode="7F3E30B1-5B8F-4B5F-9C0B-6E6AE2A2F0AA">
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
 
     <MajorUpgrade AllowDowngrades="no" Schedule="afterInstallInitialize"
-                  DowngradeErrorMessage="A newer version of ATVCompanion is already installed." />
+                  DowngradeErrorMessage="A newer version of CompanDroid is already installed." />
 
     <!-- Standard WiX UI that allows choosing InstallDir -->
     <UIRef Id="WixUI_InstallDir" />
@@ -15,13 +15,19 @@
 
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
-    <Feature Id="MainFeature" Title="ATVCompanion" Level="1" Absent="disallow">
-      <!-- App binaries -->
+    <Feature Id="MainFeature" Title="CompanDroid" Level="1" Absent="disallow">
+      <!-- UI binaries -->
       <ComponentRef Id="Cmp_UIExe" />
       <ComponentRef Id="Cmp_UIDll" />
       <ComponentRef Id="Cmp_UIDeps" />
       <ComponentRef Id="Cmp_UIRuntimeConfig" />
       <ComponentRef Id="Cmp_CoreDll" />
+
+      <!-- CLI binaries -->
+      <ComponentRef Id="Cmp_CLIExe" />
+      <ComponentRef Id="Cmp_CLIDll" />
+      <ComponentRef Id="Cmp_CLIDeps" />
+      <ComponentRef Id="Cmp_CLIRuntimeConfig" />
 
       <!-- Shortcuts + menu cleanup -->
       <ComponentRef Id="Cmp_Shortcuts" />
@@ -30,7 +36,7 @@
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="ATVCompanion">
+        <Directory Id="INSTALLFOLDER" Name="CompanDroid">
 
           <!-- One file per component to satisfy ICE/LGHT rules -->
 
@@ -59,17 +65,34 @@
             <File Id="CoreDll" Source="$(var.UIBuild)\Core.dll" KeyPath="yes" />
           </Component>
 
+          <!-- CLI.exe + runtime files installed next to UI.exe -->
+          <Component Id="Cmp_CLIExe" Guid="*">
+            <File Id="CLIExe" Source="$(var.CLIBuild)\CLI.exe" KeyPath="yes" />
+          </Component>
+
+          <Component Id="Cmp_CLIDll" Guid="*">
+            <File Id="CLIDll" Source="$(var.CLIBuild)\CLI.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="Cmp_CLIDeps" Guid="*">
+            <File Id="CLIDeps" Source="$(var.CLIBuild)\CLI.deps.json" KeyPath="yes" />
+          </Component>
+
+          <Component Id="Cmp_CLIRuntimeConfig" Guid="*">
+            <File Id="CLIRuntimeConfig" Source="$(var.CLIBuild)\CLI.runtimeconfig.json" KeyPath="yes" />
+          </Component>
+
           <!-- Per-user Start Menu shortcut in separate HKCU-keypathed component (ICE38/43/57 compliant) -->
           <Component Id="Cmp_Shortcuts" Guid="*">
             <RegistryValue Id="Reg_UserKey_ShortcutsKeyPath" Root="HKCU"
-                           Key="Software\ATVCompanion" Name="Installed" Value="1" Type="integer" KeyPath="yes"/>
+                           Key="Software\CompanDroid" Name="Installed" Value="1" Type="integer" KeyPath="yes"/>
             <Shortcut Id="StartMenuShortcut"
                       Directory="ProgramMenuDir"
-                      Name="ATVCompanion"
+                      Name="CompanDroid"
                       Description="Wake, pair, and standby your TV"
                       WorkingDirectory="INSTALLFOLDER"
                       Target="[INSTALLFOLDER]UI.exe" />
-            <RemoveFile Id="RemoveOldShortcut" Directory="ProgramMenuDir" Name="ATVCompanion.lnk" On="uninstall" />
+            <RemoveFile Id="RemoveOldShortcut" Directory="ProgramMenuDir" Name="CompanDroid.lnk" On="uninstall" />
           </Component>
 
         </Directory>
@@ -77,10 +100,10 @@
 
       <!-- Start Menu folder (per-user) -->
       <Directory Id="ProgramMenuFolder">
-        <Directory Id="ProgramMenuDir" Name="ATVCompanion">
+        <Directory Id="ProgramMenuDir" Name="CompanDroid">
           <Component Id="Cmp_RemoveProgramMenuDir" Guid="*">
             <RegistryValue Id="Reg_UserKey_MenuDirKeyPath" Root="HKCU"
-                           Key="Software\ATVCompanion" Name="Menu" Value="1" Type="integer" KeyPath="yes"/>
+                           Key="Software\CompanDroid" Name="Menu" Value="1" Type="integer" KeyPath="yes"/>
             <RemoveFolder Id="RemoveProgramMenuDir" On="uninstall"/>
           </Component>
         </Directory>
@@ -89,3 +112,4 @@
 
   </Product>
 </Wix>
+

@@ -1,6 +1,6 @@
 ![Alt text for accessibility](assets/Compandroid.png)
 
-# ATVCompanion
+# CompanDroid
 
 A small Windows app + CLI that lets you **wake**, **pair/auth**, and **put in standby** Android TVs from supported manufacturers.  
 Originally built for **Philips JointSPACE v6**, the app now supports a **manufacturer drop-down** and a pluggable backend (Philips, Sony, …).
@@ -45,7 +45,7 @@ Originally built for **Philips JointSPACE v6**, the app now supports a **manufac
   * Philips: JointSPACE `/6/input/key` with Digest (`"Standby"`)
   * Sony: JSON-RPC `setPowerStatus` via `/sony/system` (PSK/PIN auth)
 * **Shared configuration** between **UI** and **CLI**  
-  Saved at: `%ProgramData%\ATVCompanion\Config.json`
+  Saved at: `%ProgramData%\CompanDroid\Config.json`
 * **Inline logging in the UI** (no separate console window)
 * Built on **.NET 8**, with clean layering for future extensions
 
@@ -128,7 +128,7 @@ src\UI\bin\Release\net8.0-windows\UI.exe
 Saved to:
 
 ```text
-%ProgramData%\ATVCompanion\Config.json
+%ProgramData%\CompanDroid\Config.json
 ```
 
 **Daily use**
@@ -158,7 +158,7 @@ CLI.exe wake        [--mac <MAC>] [--bcast <IP>] [--port <PORT>]
 CLI.exe standby     [--ip <IP>] [--brand <philips|sony>] [--user <DEVICE_ID>] [--pass <AUTH_KEY>] [--psk <KEY>]
 
 Notes:
-- Missing flags are loaded from %ProgramData%\ATVCompanion\Config.json (AppConfig.json also accepted).
+- Missing flags are loaded from %ProgramData%\CompanDroid\Config.json (AppConfig.json also accepted).
 - Philips 'pair' performs JointSPACE v6 request/grant and persists DeviceId/AuthKey.
 - Sony 'pair' stores PSK (or completes PIN auth) for JSON-RPC power control.
 ```
@@ -187,7 +187,7 @@ CLI.exe standby --brand sony --ip 192.168.1.219 --psk mysecret
 Location:
 
 ```text
-%ProgramData%\ATVCompanion\Config.json
+%ProgramData%\CompanDroid\Config.json
 ```
 
 Examples:
@@ -235,7 +235,7 @@ If you see errors like “Unknown command: tasks / create-tasks / install-tasks�
 
 ```bash
 # Example: wake daily at 07:00
-schtasks /Create /TN "ATVCompanion\WakeDaily" ^
+schtasks /Create /TN "CompanDroid\WakeDaily" ^
   /TR "\"C:\path\to\CLI.exe\" wake" ^
   /SC DAILY /ST 07:00 /RL HIGHEST
 ```
@@ -280,9 +280,9 @@ Retry with a fresh PIN if delayed.
 * If broadcast IP is wrong, pass `--bcast` explicitly
 
 **CLI ignores saved config**
-* Ensure `Config.json` exists at `%ProgramData%\ATVCompanion\Config.json`
+* Ensure `Config.json` exists at `%ProgramData%\CompanDroid\Config.json`
 * Verify it contains the fields shown above
-* CLI also checks `%ProgramData%\ATVCompanion\AppConfig.json` and local folder fallbacks
+* CLI also checks `%ProgramData%\CompanDroid\AppConfig.json` and local folder fallbacks
 
 **UI shows nothing / `InitializeComponent` warning**  
 Typically a mismatched class/namespace between `MainWindow.xaml` and code-behind.
@@ -310,7 +310,7 @@ Safe to ignore for now. The SDK choice will be tidied later.
 * 🧰 CLI verbs for **task management** (so the UI can rely on them)
 * 🔌 More plugins (e.g., LG webOS, Samsung) behind the same interface
 * 🗒️ More controls (volume, input, app launch) per brand capabilities
-* 📦 Optional installer/MSI
+* 📦 Optional installer/MSI (CompanDroid)
 
 ---
 
@@ -336,3 +336,4 @@ PRs welcome! Please include:
 * Philips / TP-Vision JointSPACE docs & community notes  
 * Sony Bravia IP control documentation and community examples  
 * Everyone who tested pairing/WOL and helped land this milestone 🎉
+
