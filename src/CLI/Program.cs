@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.IO;
 
@@ -15,7 +16,10 @@ namespace CLI
         public string? Ip { get; set; }
         public string? Mac { get; set; }
         public string? DeviceId { get; set; }  // username for Digest
-        public string? AuthKey { get; set; }   // password for Digest
+        public string? AuthKey { get; set; }   // password for Digest (Philips) / PSK (Sony)
+
+        [JsonPropertyName("manufacturer")]
+        public string? Manufacturer { get; set; }
     }
 
     internal static class Program
@@ -85,11 +89,12 @@ namespace CLI
 
 Usage:
   CLI.exe wake [--mac <MAC>] [--bcast <IP>] [--port <PORT>]
-  CLI.exe standby [--ip <IP>] [--user <DEVICE_ID>] [--pass <AUTH_KEY>]
+  CLI.exe standby [--brand <philips|sony>] [--ip <IP>] [--user <DEVICE_ID>] [--pass <AUTH_KEY>] [--psk <PSK>]
 
 Notes:
   - Missing flags are loaded from %ProgramData%\CompanDroid\Config.json (legacy ATVCompanion paths are also accepted).
-  - 'standby' posts https://<ip>:1926/6/input/key { ""key"": ""Standby"" } with Digest auth.
+  - Philips standby posts https://<ip>:1926/6/input/key { ""key"": ""Standby"" } with Digest auth.
+  - Sony standby posts JSON-RPC setPowerStatus to http://<ip>/sony/system using PSK.
 ");
         }
 
@@ -99,6 +104,12 @@ Notes:
                 if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase))
                     return args[i + 1];
             return null;
+        }
+
+        static string NormalizeBrand(string? brand)
+        {
+            if (string.Equals(brand, "sony", StringComparison.OrdinalIgnoreCase)) return "Sony";
+            return "Philips";
         }
 
         static AppConfig? LoadConfig()
@@ -111,13 +122,11 @@ Notes:
                     var json = File.ReadAllText(path);
                     if (string.IsNullOrWhiteSpace(json)) continue;
 
-                    // Accept snake_case keys too (device_id/auth_key) via case-insensitive matching
+                    // Accept snake_case keys too (device_id/auth_key/manufacturer)
                     var cfg = JsonSerializer.Deserialize<AppConfig>(json, ConfigJsonOptions);
                     if (cfg != null)
                     {
-                        // Also try to extract snake_case manually if standard props are empty.
-                        // (Cheap fallback for very old files)
-                        if ((cfg.DeviceId == null || cfg.AuthKey == null) &&
+                        if ((cfg.DeviceId == null || cfg.AuthKey == null || cfg.Manufacturer == null) &&
                             json.IndexOf("device_id", StringComparison.OrdinalIgnoreCase) >= 0)
                         {
                             using var doc = JsonDocument.Parse(json);
@@ -127,6 +136,7 @@ Notes:
                             if (root.TryGetProperty("auth_key", out var a)) cfg.AuthKey = a.GetString();
                             if (root.TryGetProperty("ip", out var ip)) cfg.Ip = ip.GetString();
                             if (root.TryGetProperty("mac", out var mac)) cfg.Mac = mac.GetString();
+                            if (root.TryGetProperty("manufacturer", out var m)) cfg.Manufacturer = m.GetString();
                         }
                         return cfg;
                     }
@@ -206,15 +216,32 @@ Notes:
         static async Task<int> RunStandby(string[] args)
         {
             var cfg = LoadConfig();
-
-            var ip   = Flag(args, "--ip")   ?? cfg?.Ip;
-            var user = Flag(args, "--user") ?? cfg?.DeviceId;
-            var pass = Flag(args, "--pass") ?? cfg?.AuthKey;
+            var brand = NormalizeBrand(Flag(args, "--brand") ?? cfg?.Manufacturer);
+            var ip = Flag(args, "--ip") ?? cfg?.Ip;
 
             if (string.IsNullOrWhiteSpace(ip))
                 return Fail("Missing --ip <IP> and no saved IP in config.");
+
+            if (brand == "Sony")
+            {
+                var psk = Flag(args, "--psk") ?? Flag(args, "--pass") ?? cfg?.AuthKey;
+                if (string.IsNullOrWhiteSpace(psk))
+                    return Fail("Missing Sony PSK. Provide --psk (or --pass) or pair Sony in the UI first.");
+
+                var ok = await SonyPowerOffAsync(ip!, psk!);
+                if (!ok)
+                    return Fail("Sony standby failed. Check IP control settings, PSK, and network reachability.");
+
+                Console.WriteLine("Standby sent.");
+                return 0;
+            }
+
+            // Philips (default)
+            var user = Flag(args, "--user") ?? cfg?.DeviceId;
+            var pass = Flag(args, "--pass") ?? cfg?.AuthKey;
+
             if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass))
-                return Fail("Missing credentials. Provide --user/--pass or pair in the UI first.");
+                return Fail("Missing Philips credentials. Provide --user/--pass or pair in the UI first.");
 
             var handler = new HttpClientHandler
             {
@@ -227,7 +254,6 @@ Notes:
             handler.PreAuthenticate = true;
 
             using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(6) };
-
             var uri = $"https://{ip}:1926/6/input/key";
             var content = new StringContent(JsonSerializer.Serialize(new { key = "Standby" }), Encoding.UTF8, "application/json");
 
@@ -240,6 +266,34 @@ Notes:
 
             Console.WriteLine("Standby sent.");
             return 0;
+        }
+
+        static async Task<bool> SonyPowerOffAsync(string ip, string psk)
+        {
+            try
+            {
+                using var http = new HttpClient
+                {
+                    BaseAddress = new Uri($"http://{ip}/"),
+                    Timeout = TimeSpan.FromSeconds(8)
+                };
+
+                var req = new HttpRequestMessage(HttpMethod.Post, "sony/system")
+                {
+                    Content = new StringContent(
+                        "{\"method\":\"setPowerStatus\",\"id\":1,\"params\":[{\"status\":false}],\"version\":\"1.0\"}",
+                        Encoding.UTF8,
+                        "application/json")
+                };
+
+                req.Headers.Add("X-Auth-PSK", psk);
+                using var resp = await http.SendAsync(req);
+                return resp.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         static int Fail(string msg)

@@ -13,7 +13,15 @@ namespace UI
         private void CreateTasksButton_Click(object sender, RoutedEventArgs e)
         {
             var cfg = ConfigStore.Load();
-            if (cfg == null || string.IsNullOrWhiteSpace(cfg.DeviceId) || string.IsNullOrWhiteSpace(cfg.AuthKey))
+            var brand = string.IsNullOrWhiteSpace(cfg?.Manufacturer) ? "Philips" : cfg!.Manufacturer!;
+            var hasIp = !string.IsNullOrWhiteSpace(cfg?.Ip);
+            var hasMac = !string.IsNullOrWhiteSpace(cfg?.Mac);
+
+            bool usableConfig = brand.Equals("Sony", StringComparison.OrdinalIgnoreCase)
+                ? hasIp && hasMac && !string.IsNullOrWhiteSpace(cfg?.AuthKey)
+                : hasIp && hasMac && !string.IsNullOrWhiteSpace(cfg?.DeviceId) && !string.IsNullOrWhiteSpace(cfg?.AuthKey);
+
+            if (!usableConfig)
             {
                 MessageBox.Show("No configuration found. Pair the app with the TV first.", "CompanDroid", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -39,4 +47,3 @@ namespace UI
         }
     }
 }
-

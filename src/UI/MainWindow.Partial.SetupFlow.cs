@@ -19,7 +19,14 @@ namespace UI
             try
             {
                 var cfg = ConfigStore.Load();
-                bool paired = cfg != null && !string.IsNullOrWhiteSpace(cfg.DeviceId) && !string.IsNullOrWhiteSpace(cfg.AuthKey);
+                var brand = string.IsNullOrWhiteSpace(cfg?.Manufacturer) ? "Philips" : cfg!.Manufacturer!;
+                var hasIp = !string.IsNullOrWhiteSpace(cfg?.Ip);
+                var hasMac = !string.IsNullOrWhiteSpace(cfg?.Mac);
+
+                bool paired = brand.Equals("Sony", StringComparison.OrdinalIgnoreCase)
+                    ? hasIp && hasMac && !string.IsNullOrWhiteSpace(cfg?.AuthKey) // Sony uses PSK in AuthKey
+                    : hasIp && hasMac && !string.IsNullOrWhiteSpace(cfg?.DeviceId) && !string.IsNullOrWhiteSpace(cfg?.AuthKey);
+
                 CreateTasksButton.IsEnabled = paired;
             }
             catch

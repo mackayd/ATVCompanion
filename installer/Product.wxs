@@ -2,7 +2,7 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
      xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
 
-  <Product Id="*" Name="CompanDroid" Language="1033" Version="1.0.1.0" Manufacturer="CompanDroid"
+  <Product Id="*" Name="CompanDroid" Language="1033" Version="1.0.2.0" Manufacturer="CompanDroid"
            UpgradeCode="7F3E30B1-5B8F-4B5F-9C0B-6E6AE2A2F0AA">
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
 
@@ -112,4 +112,5 @@
 
   </Product>
 </Wix>
+
 
