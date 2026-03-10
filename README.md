@@ -10,7 +10,9 @@ Originally built for **Philips JointSPACE v6**, the app now supports a **manufac
 > • Wake-on-LAN works  
 > • Standby works  
 > • Config is persisted and reused across runs (UI & CLI share it)  
-> ⚠️ **“Create Tasks”** (Windows Task Scheduler helper) exists but is still being finalized.
+> • “Create Windows Tasks” issue resolved.
+>
+> ✨ Latest Release MSI commpiled and tested ✨
 
 ---
 
